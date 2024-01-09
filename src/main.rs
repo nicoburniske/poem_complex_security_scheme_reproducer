@@ -4,7 +4,7 @@ fn main() {}
 mod test {
     use poem::test::TestClient;
     use poem::web::headers;
-    use poem::{http, Request};
+    use poem::{http, Endpoint, Request, Response};
     use poem_openapi::auth::{ApiKey, Bearer};
     use poem_openapi::payload::PlainText;
     use poem_openapi::SecurityScheme;
@@ -81,12 +81,15 @@ mod test {
         }
     }
 
-    #[tokio::test]
-    async fn checker_result() {
+    fn make_client() -> TestClient<Box<(dyn Endpoint<Output = Response> + 'static)>> {
         let service = poem_openapi::OpenApiService::new(MyApi, "test", "1.0");
-        let client = TestClient::new(service);
+        TestClient::new(service)
+    }
 
-        // Cookie enabled.
+    #[tokio::test]
+    async fn cookie_enabled() {
+        let client = make_client();
+
         let resp = client
             .get("/test")
             .header(
@@ -97,8 +100,12 @@ mod test {
             .await;
         resp.assert_status_is_ok();
         resp.assert_text("Authed: Enabled").await;
+    }
 
-        // Bearer Enabled.
+    #[tokio::test]
+    async fn bearer_enabled() {
+        let client = make_client();
+
         let resp = client
             .get("/test")
             .typed_header(headers::Authorization::bearer("Enabled").unwrap())
@@ -106,8 +113,11 @@ mod test {
             .await;
         resp.assert_status_is_ok();
         resp.assert_text("Authed: Enabled").await;
+    }
 
-        // Cookie disabled.
+    #[tokio::test]
+    async fn cookie_disabled() {
+        let client = make_client();
         let resp = client
             .get("/test")
             .header(
@@ -119,8 +129,12 @@ mod test {
 
         resp.assert_status(http::StatusCode::FORBIDDEN);
         resp.assert_text("Your account is disabled").await;
+    }
 
-        // Bearer disabled.
+    #[tokio::test]
+    async fn bearer_disabled() {
+        let client = make_client();
+
         // THIS TEST IS FAILING.
         // The error is being swallowed, and the default response is being returned instead.
         // Status: 401
